@@ -1,0 +1,71 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Data::Dumper;
+
+# Define the file to read data from
+my $input_file = 'phase0_data.txt';
+
+# In a real-world scenario, you would perform robust error handling for file I/O
+open my $fh, '<', $input_file or die "Could not open $input_file: $!";
+
+# Data structure to hold parsed data
+my %trial_data;
+
+# Parse the data file line by line
+while (my $line = <$fh>) {
+    chomp $line;
+    next if $line =~ /^#/; # Skip comments
+    next unless $line;    # Skip empty lines
+
+    # Expected format: PatientID|Microdose(ug)|AdminTime|SampleTime|Concentration(ng/mL)
+    my ($patient_id, $microdose, $admin_time, $sample_time, $concentration) = split /\|/, $line;
+
+    # Basic data validation
+    unless ($patient_id && $microdose =~ /^\d+(\.\d+)?$/ && $admin_time && $sample_time && $concentration =~ /^\d+(\.\d+)?$/) {
+        warn "Skipping invalid line: $line\n";
+        next;
+    }
+
+    # Store the data in a nested hash
+    unless (exists $trial_data{$patient_id}) {
+        $trial_data{$patient_id} = {
+            microdose => $microdose,
+            admin_time => $admin_time,
+            samples => []
+        };
+    }
+
+    push @{$trial_data{$patient_id}->{samples}}, {
+        sample_time => $sample_time,
+        concentration => $concentration
+    };
+}
+
+close $fh;
+
+# Output the structured data
+print "--- Phase 0 Trial Data ---\n";
+print Dumper(\%trial_data);
+
+# Example of how you might use the data
+# Find the highest concentration for each patient
+print "\n--- Peak Concentrations ---\n";
+foreach my $patient (sort keys %trial_data) {
+    my $max_concentration = 0;
+    foreach my $sample (@{$trial_data{$patient}->{samples}}) {
+        if ($sample->{concentration} > $max_concentration) {
+            $max_concentration = $sample->{concentration};
+        }
+    }
+    print "Patient $patient: Peak Concentration = $max_concentration ng/mL\n";
+}
+
+__END__
+# Data for phase0_data.txt
+# PatientID|Microdose(ug)|AdminTime|SampleTime|Concentration(ng/mL)
+P001|15|2025-08-12T09:00:00|2025-08-12T09:15:00|5.2
+P001|15|2025-08-12T09:00:00|2025-08-12T10:00:00|8.9
+P001|15|2025-08-12T09:00:00|2025-08-12T11:00:00|7.1
+P002|15|2025-08-12T09:05:00|2025-08-12T09:20:00|6.1
+P002|15|2025-08-12T09:05:00|2025-08-12T10:05:00|10.5
